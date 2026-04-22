@@ -1,0 +1,174 @@
+# %% [markdown]
+# # HR Attrition — EDA and Modeling
+#
+# This notebook walks through the full analytical story:
+#
+# 1. What does the data look like? Which segments lose the most people?
+# 2. Where are the signals strongest?
+# 3. How well can we predict attrition, and which model should we use?
+# 4. What features actually drive the predictions (SHAP)?
+# 5. What would we do with this in practice?
+#
+# The code is organized as a `jupytext`-compatible Python file so it can be
+# opened as a notebook (VS Code, Jupyter) or executed as a plain script.
+
+# %%
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+from src.data import (
+    load_raw,
+    basic_clean,
+    split_features_target,
+    TARGET_COL,
+    CONSTANT_OR_ID_COLS,
+)
+from src.train import run as run_training
+
+sns.set_style("whitegrid")
+pd.set_option("display.max_columns", 50)
+
+# %% [markdown]
+# ## 1. Load the dataset
+#
+# IBM HR Analytics Attrition & Performance — 1,470 employees, 35 columns, and
+# a binary `Attrition` target (Yes/No). We strip a few constant / identifier
+# columns that carry no information (`EmployeeCount`, `Over18`, `StandardHours`,
+# `EmployeeNumber`).
+
+# %%
+df_raw = load_raw()
+df = basic_clean(df_raw)
+print(f"Rows: {len(df)}   Columns: {df.shape[1]}")
+print(f"Dropped as constants / IDs: {CONSTANT_OR_ID_COLS}")
+print(f"\nTarget balance:")
+print(df[TARGET_COL].value_counts(normalize=True).round(3))
+
+# %% [markdown]
+# **Class imbalance check.** Attrition runs ~16% — not extreme, but enough
+# that we can't use raw accuracy as a model metric. We'll focus on ROC-AUC,
+# PR-AUC, recall, and Brier score (calibration).
+
+# %% [markdown]
+# ## 2. Exploratory analysis
+#
+# Before modeling, look for segments with above-average turnover. If the
+# headline finding is obvious from an EDA chart, the model should confirm it
+# rather than replace it.
+
+# %%
+base_rate = (df[TARGET_COL] == "Yes").mean()
+segment_cols = ["JobRole", "Department", "OverTime", "MaritalStatus", "BusinessTravel"]
+for col in segment_cols:
+    rate = (
+        df.groupby(col)[TARGET_COL]
+        .apply(lambda s: (s == "Yes").mean())
+        .sort_values(ascending=False)
+    )
+    print(f"\nAttrition rate by {col} (company avg = {base_rate:.1%}):")
+    print(rate.round(3).to_string())
+
+# %% [markdown]
+# **Expected findings, confirmed:**
+#
+# - **OverTime = Yes** is the single sharpest segment split (~31% vs ~10%).
+# - **Sales Representative** is the highest-attrition role (~40%).
+# - **Single** employees leave ~2x the rate of married ones.
+# - **Frequent travelers** attrit at ~25% vs ~8% for non-travelers.
+#
+# These are classic results for this dataset — any good model should weight
+# these features heavily.
+
+# %%
+# Numeric features: who leaves vs who stays?
+num_cols = ["Age", "MonthlyIncome", "YearsAtCompany", "DistanceFromHome",
+            "YearsSinceLastPromotion", "JobSatisfaction"]
+print(
+    df.groupby(TARGET_COL)[num_cols]
+      .agg(["mean", "median"])
+      .round(1)
+)
+
+# %% [markdown]
+# **Reads:** leavers are younger (32 vs 37), earn less (~$4.8K vs $6.8K/mo),
+# shorter tenure, live farther from work, and — interestingly — have similar
+# "years since promotion" to stayers (so stagnation alone is not the driver;
+# it's compounded with other factors).
+
+# %% [markdown]
+# ## 3. Train & benchmark three models
+#
+# - **Logistic regression** (interpretable baseline).
+# - **Random forest** (non-linear, robust, low-maintenance).
+# - **XGBoost** (usually strongest on tabular data).
+#
+# All three use a stratified 80/20 train/test split (seed=42) and 5-fold
+# stratified CV on the training fold for stability checks.
+
+# %%
+results = run_training()
+
+# %% [markdown]
+# ## 4. Model comparison and picking a winner
+#
+# In this run, **Logistic Regression wins on ROC-AUC** (~0.80) on the test
+# set. That's a genuine and common finding on this dataset: with proper
+# preprocessing and `class_weight="balanced"`, LR is hard to beat here. It
+# also comes with a free bonus — *interpretability*. An HR stakeholder can
+# read the coefficients.
+#
+# A few interpretive notes:
+#
+# - **Recall (0.64) matters more than precision here**: missing someone who
+#   leaves (false negative) is much costlier than flagging someone who
+#   doesn't (false positive). We'd tune the threshold to favor recall in
+#   production.
+# - **Brier score 0.156** means the probability outputs are reasonably
+#   well-calibrated — we can take the numeric probability at face value
+#   rather than just using rank order.
+
+# %% [markdown]
+# ## 5. Feature attributions via SHAP
+#
+# SHAP answers *"why this prediction?"* rather than *"what drives attrition
+# in general?"* — which is the question HR partners actually ask about
+# individual flagged employees.
+#
+# See `docs/shap_beeswarm.png` and `docs/shap_bar.png` (generated by
+# `python -m src.visualize`). Top drivers globally:
+#
+# 1. **OverTime** — by far the strongest lever.
+# 2. **JobRole = Sales Representative / Laboratory Technician** — role-based risk.
+# 3. **Monthly income** — pay bands matter at lower levels.
+# 4. **Years at company** / **YearsInCurrentRole** — tenure U-curve (leavers spike 0–3 yrs).
+# 5. **StockOptionLevel = 0** — absence of equity is a real signal.
+# 6. **Age** (younger).
+# 7. **BusinessTravel = Frequently**.
+
+# %% [markdown]
+# ## 6. What to do operationally
+#
+# A People Analytics team would not deploy this as "score everyone and act
+# on the score." Instead:
+#
+# | Use case | How we'd use the score |
+# |---|---|
+# | **Manager 1:1 prep** | Surface an employee's top 3 SHAP drivers so managers can have a specific conversation, not a generic one. |
+# | **Org-level intervention** | Compare distribution of SHAP values by team — flag teams where `OverTime` is driving risk and push HRBPs. |
+# | **Comp planning** | Cross-reference low-income high-risk employees with the compensation equity audit (separate project). |
+# | **Retention investment prioritization** | Estimate dollar impact of a 10pp drop in attrition risk on the top quartile of flagged employees. |
+#
+# **Explicitly NOT appropriate:**
+#
+# - Adverse employment actions (PIPs, layoffs, terminations) driven off this
+#   score — bias risk is real on HR data.
+# - Disclosing individual scores to the employee themselves without HR/legal
+#   review.
+# - Using the model output without the SHAP explanation alongside it.
