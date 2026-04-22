@@ -41,6 +41,19 @@ That's what this project demonstrates.
 
 Four constant/identifier columns (`EmployeeCount`, `Over18`, `StandardHours`, `EmployeeNumber`) are dropped before modeling since they carry no signal.
 
+### Where attrition actually concentrates
+
+![Attrition segments](docs/attrition_segments.png)
+
+Two findings to highlight — both consistent with what any experienced HR practitioner would expect, and exactly the signals a good model should pick up on:
+
+- **OverTime = Yes → ~31% attrition** vs ~10% for non-OT employees. This is the single sharpest split in the dataset.
+- **Sales Representative, Research Scientist (early-career), Lab Technician** show role-specific risk that sits above the company average regardless of individual attributes.
+
+![Numeric distributions](docs/numeric_distributions.png)
+
+The numeric distributions tell the tenure / pay / age story: leavers skew younger, shorter-tenured, lower-income, and live farther from the office — the classic first-3-year cliff pattern.
+
 ---
 
 ## Model performance
