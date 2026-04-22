@@ -112,22 +112,28 @@ The Streamlit app surfaces per-prediction SHAP so an HRBP can see *"this employe
 
 ---
 
-## Demo
+## Interactive dashboard
 
-### Run the interactive predictor locally
+A multi-page Streamlit app ships with the repo:
+
+| Page | Purpose |
+|---|---|
+| **Home** | Workforce summary + KPIs |
+| **📊 Workforce Dashboard** | Aggregate attrition risk — filters by role, department, overtime, risk band; drill-downs by role/dept/tenure; exportable CSV of top-flagged employees |
+| **👤 Individual Scoring** | Build an employee profile, get a risk band, see top 10 SHAP drivers |
 
 ```bash
 pip install -r requirements.txt
 python -m src.train        # train models (~30 seconds)
-python -m src.visualize    # regenerate docs/ figures (~30 seconds)
+python -m src.visualize    # regenerate docs/ figures
 streamlit run app/streamlit_app.py
 ```
 
-The demo lets you:
-
-1. Build an employee profile in the sidebar (defaults to population median/mode).
-2. Get an attrition probability and a risk band (High / Medium / Low).
-3. See the top 10 features contributing to the prediction with direction (risk ↑ or risk ↓).
+**Tableau / Power BI / Looker users:** generate a Tableau-ready CSV:
+```bash
+python -m src.export_tableau   # writes tableau/attrition_scored.csv
+```
+Then follow [docs/TABLEAU.md](docs/TABLEAU.md) for the recipe to build six dashboard views from the exported CSV.
 
 ### Run the notebook
 
