@@ -1,5 +1,7 @@
 # HR Attrition Predictor
 
+![CI](https://github.com/Jott2121/hr-attrition-predictor/actions/workflows/ci.yml/badge.svg)
+
 Responsible retention risk modeling and workforce stability decision support. Predicts voluntary attrition from standard HR data and explains each prediction with per-individual SHAP attributions, so HR business partners get conversation-ready drivers rather than opaque scores.
 
 **[Live dashboard →](https://hr-attrition-predictor-jotterson.streamlit.app/)** (no install required)
