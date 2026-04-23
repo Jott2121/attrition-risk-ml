@@ -4,6 +4,10 @@ Predicting voluntary employee attrition from standard HR data — and, more impo
 
 **Built by a former Fortune 500 talent acquisition leader applying modern ML to the problems I spent 15+ years solving by hand.**
 
+### 🚀 [Live demo: hr-attrition-predictor-jotterson.streamlit.app](https://hr-attrition-predictor-jotterson.streamlit.app/)
+
+No install required — click through the workforce dashboard and individual scoring pages directly in your browser.
+
 ![Model comparison](docs/model_comparison.png)
 
 ---
