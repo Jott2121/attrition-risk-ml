@@ -43,6 +43,18 @@ That's what this project demonstrates.
 - **Base rate**: ~16.1% attrition
 - **Stratified 80/20 split**, seed = 42
 
+### Feature schema
+
+| Category | Features |
+|---|---|
+| **Demographics** | Age, Gender, MaritalStatus, DistanceFromHome |
+| **Job context** | JobRole, Department, JobLevel (1-5), BusinessTravel, OverTime |
+| **Tenure** | YearsAtCompany, YearsInCurrentRole, YearsWithCurrManager, YearsSinceLastPromotion, TotalWorkingYears, NumCompaniesWorked |
+| **Compensation** | MonthlyIncome, HourlyRate, DailyRate, PercentSalaryHike, StockOptionLevel (0-3) |
+| **Engagement** | JobSatisfaction (1-4), EnvironmentSatisfaction (1-4), WorkLifeBalance (1-4), RelationshipSatisfaction (1-4), JobInvolvement (1-4) |
+| **Performance** | PerformanceRating, TrainingTimesLastYear |
+| **Education** | Education (1-5), EducationField |
+
 Four constant/identifier columns (`EmployeeCount`, `Over18`, `StandardHours`, `EmployeeNumber`) are dropped before modeling since they carry no signal.
 
 ### Where attrition actually concentrates
@@ -59,6 +71,18 @@ Two findings to highlight — both consistent with what any experienced HR pract
 The numeric distributions tell the tenure / pay / age story: leavers skew younger, shorter-tenured, lower-income, and live farther from the office — the classic first-3-year cliff pattern.
 
 ---
+
+## How each model makes a decision
+
+Each of the three benchmarked models arrives at a prediction differently. Understanding the mechanics matters for interpretation and for defending the choice to HR stakeholders.
+
+**Logistic Regression (selected model).** Assigns a numeric weight to each feature and computes a weighted sum for every employee. That sum is passed through a sigmoid function to produce a probability between 0 and 1. For this dataset, `OverTime=Yes` carries a large positive weight (pushing the probability toward 1, i.e. attrition), while `StockOptionLevel=3` carries a negative weight (pushing toward 0). The final prediction is the sum of these contributions, squashed into a probability. The coefficients are directly inspectable, which is why HR teams tend to trust this class of model when the performance is competitive.
+
+**Random Forest.** Builds an ensemble of 400 decision trees, each trained on a bootstrap sample of the data with a random subset of features at each split. Each tree casts a Yes/No vote for a given employee, and the final probability is the proportion of trees voting Yes. Individual trees are high-variance; averaging across 400 stabilizes the prediction. The mechanism handles non-linear interactions automatically (e.g. "high overtime *and* low job satisfaction" is worse than either alone), but the ensemble as a whole is harder to explain to non-technical stakeholders.
+
+**XGBoost.** Builds 400 trees *sequentially* rather than independently. Each new tree is trained specifically to correct the errors made by the ensemble so far. Early trees learn the obvious patterns (OverTime, tenure); later trees learn the subtle interactions and edge cases. Typically the strongest performer on structured tabular data, though it requires more data than this dataset provides to meaningfully outperform logistic regression.
+
+All three use `class_weight="balanced"` (or `scale_pos_weight` for XGBoost) to counteract the 84/16 class imbalance — otherwise every model would learn to predict "stays" for everyone and score ~84% accuracy while being useless.
 
 ## Model performance
 
@@ -112,19 +136,59 @@ Ranked by mean absolute contribution to predictions (top features):
 
 ### Per-individual: why *this* employee
 
-The Streamlit app surfaces per-prediction SHAP so an HRBP can see *"this employee is flagged because: OverTime = Yes (+), 2 years since last promotion (+), JobSatisfaction = Low (+), below-median comp for role/level (+)"* — a conversation starter, not a black box.
+SHAP values answer the question: *"For this specific employee, how much did each feature contribute to the predicted probability?"*
+
+A SHAP value has two properties:
+- **Sign**: positive means the feature pushed the prediction toward attrition; negative means toward retention.
+- **Magnitude**: the size of the push, expressed in log-odds units (for logistic regression) or probability units directly.
+
+A worked example. Suppose the model assigns Employee #42 an attrition probability of 78%. The SHAP breakdown might look like:
+
+| Feature | Value | SHAP contribution | Direction |
+|---|---|---:|---|
+| Baseline (population average) | — | +0.18 | starting point |
+| OverTime | Yes | +0.22 | ↑ attrition |
+| YearsAtCompany | 1 | +0.14 | ↑ attrition (first-3-year cliff) |
+| JobSatisfaction | 1 (lowest) | +0.11 | ↑ attrition |
+| MonthlyIncome | $3,200 | +0.08 | ↑ attrition (below median for role) |
+| Age | 28 | +0.05 | ↑ attrition |
+| *(remaining features)* | — | 0.00 | neutral |
+| **Predicted probability** | — | **0.78** | **High risk** |
+
+The contributions add up to the model's actual prediction. This is what makes the score actionable: an HRBP can surface the top three drivers for a flagged employee and have a specific conversation with that employee's manager — rather than producing a black-box number and hoping the manager knows what to do with it.
 
 ---
 
 ## Interactive dashboard
 
-A multi-page Streamlit app ships with the repo:
+A multi-page Streamlit app ships with the repo. [Try the live version](https://hr-attrition-predictor-jotterson.streamlit.app/) or run it locally.
 
-| Page | Purpose |
-|---|---|
-| **Home** | Workforce summary + KPIs |
-| **📊 Workforce Dashboard** | Aggregate attrition risk — filters by role, department, overtime, risk band; drill-downs by role/dept/tenure; exportable CSV of top-flagged employees |
-| **👤 Individual Scoring** | Build an employee profile, get a risk band, see top 10 SHAP drivers |
+### Home page
+
+- KPI strip: workforce size, currently attrited count and rate, count of high-risk employees (probability ≥ 60%), median tenure of leavers, selected model
+- Snapshot bar charts: attrition rate by job role, attrition rate by department
+
+### Workforce Dashboard
+
+The aggregate view a People Analytics team would use in a quarterly review.
+
+- **Filters**: job role (multi-select), department (multi-select), overtime status, business travel frequency, predicted-risk range slider
+- **Live KPIs**: filtered employee count, average predicted risk, high-risk employee count, median tenure and income
+- **Risk distribution histogram** across the filtered population
+- **Risk band mix table**: count and percentage in Low / Medium / High bands
+- **Segment analysis**: four tabs (Job Role, Department, Overtime, Tenure bucket) showing per-segment employee count, average risk, count of high-risk employees, percentage high-risk — formatted with a red gradient so the worst segments jump out
+- **Top 20 highest-risk employees table** with role, department, tenure, overtime flag, income, travel, age
+- **CSV exports**: filtered data and top-20 flagged employees
+
+### Individual Scoring
+
+Score a specific employee profile.
+
+- Sidebar form for all 30 features, pre-populated with population median (numeric) and mode (categorical)
+- Click "Score this employee" to generate:
+  - Attrition probability percentage
+  - Risk band (High / Medium / Low) with recommended action
+  - Top 10 features ranked by absolute SHAP contribution, with direction indicator and value color-graded (red for ↑ risk, blue for ↓ risk)
 
 ```bash
 pip install -r requirements.txt
