@@ -1,12 +1,8 @@
 # HR Attrition Predictor
 
-Predicting voluntary employee attrition from standard HR data — and, more importantly, explaining *why* the model makes each prediction so HR business partners can act on it.
+Responsible retention risk modeling and workforce stability decision support. Predicts voluntary attrition from standard HR data and explains each prediction with per-individual SHAP attributions, so HR business partners get conversation-ready drivers rather than opaque scores.
 
-**Built by a former Fortune 500 talent acquisition leader applying modern ML to the problems I spent 15+ years solving by hand.**
-
-### 🚀 [Live demo: hr-attrition-predictor-jotterson.streamlit.app](https://hr-attrition-predictor-jotterson.streamlit.app/)
-
-No install required — click through the workforce dashboard and individual scoring pages directly in your browser.
+**[Live dashboard →](https://hr-attrition-predictor-jotterson.streamlit.app/)** (no install required)
 
 ![Model comparison](docs/model_comparison.png)
 
@@ -230,6 +226,68 @@ I've sat on the hiring side of thousands of requisitions. Predictions alone don'
 
 ---
 
+## Enterprise deployment
+
+This project is structured as a decision-support tool, not a production system. The notes below document what would change in an enterprise rollout.
+
+### Source system mapping
+
+| Feature category | Production source |
+|---|---|
+| Demographics, tenure, comp | HRIS Worker table (Workday / Oracle HCM / SAP SuccessFactors) |
+| Engagement & satisfaction | Engagement survey platform (Glint / Qualtrics EmployeeXM / Culture Amp) |
+| Performance & calibration | HRIS `Performance_Review` + calibration workflow exports |
+| Training & certifications | LMS (Cornerstone / Workday Learning / Degreed) |
+| Manager / org hierarchy | HRIS reporting tree, refreshed on org change events |
+
+Skill family and business unit are rarely clean in native HRIS — they typically require a job-architecture mapping maintained by HR operations.
+
+### Data quality checks
+
+Before a score is produced, the pipeline should enforce:
+
+- **Required fields non-null**: job role, department, level, tenure, compensation
+- **Duplicate detection** on employee ID across integration refreshes
+- **Business-unit and job-family canonicalization** — subsidiary / legacy-name consolidation
+- **Outlier handling on tenure and comp** — entries outside plausible ranges quarantined, not silently included
+- **Engagement survey age**: scores older than 12 months flagged as stale
+- **Refresh cadence**: weekly for workforce dashboard use; daily isn't necessary for retention work
+
+### Governance and security
+
+- **Role-based access**: HRBPs see only employees in their assigned business unit; TA and total rewards partners see their portfolio only; People Analytics sees enterprise-wide aggregates. Employee-level scores never flow to peers or direct reports.
+- **PII handling**: the model uses demographic inputs (age, gender, marital status) only where legally permissible and operationally justified. A production deployment should run a separate no-demographics variant and compare outputs; if demographic inputs don't meaningfully improve calibration, they should be removed to reduce legal exposure.
+- **Explainability requirement**: every individual score must surface SHAP drivers. A probability without its explanation is not a permitted output.
+- **Audit log**: every score request records requester, employee viewed, timestamp, and model version.
+- **Legal review**: required before any HRBP acts on a specific score, and again annually on the model itself.
+
+### Model monitoring
+
+- **Drift**: compare predicted vs actual attrition monthly; alert if Brier score degrades > 0.02 or if base-rate estimate drifts > 3 pp.
+- **Retraining**: quarterly retraining on trailing 24 months of data; monthly if the workforce has undergone a material org change (acquisition, divestiture, RIF).
+- **Bias monitoring**: run subgroup-fairness checks (equalized odds across gender, race where available, age bands) on every retraining. Document any disparity and the remediation plan.
+- **Threshold review**: the 0.60 High-risk threshold is an assumption, not a fact. Review it annually against actual intervention outcomes.
+- **Change log**: every feature change, hyperparameter change, or threshold change is logged with rationale and approval.
+
+### Legal review points
+
+- **Adverse-action restriction**: outputs cannot be used for termination, PIP, demotion, or RIF selection. This must be explicit in the tool's terms of use and communicated to HRBPs at rollout.
+- **Individual disclosure**: employees have the right (in many jurisdictions, the legal requirement) to understand how automated decisions affect them. Any process that surfaces a retention-risk score to the employee requires legal and HR sign-off on the disclosure language.
+- **Cross-border deployment**: GDPR Article 22, EU AI Act (high-risk HR systems), state-level US laws (Illinois, New York), and sectoral regulations vary significantly. Each jurisdiction needs its own review.
+
+### User roles
+
+| Role | Permitted use |
+|---|---|
+| HR Business Partners | View scores for employees in their BU; use SHAP drivers to prepare manager conversations |
+| Talent Acquisition leaders | Aggregate risk trends in their portfolio for succession and backfill planning |
+| Total Rewards | Cross-reference low-comp × high-risk employees against comp equity audit outputs |
+| People Analytics | Maintain, monitor, and retrain the model; investigate drift and bias |
+| Managers | See their direct team's aggregate risk posture — not individual scores |
+| Executives | Enterprise-wide and BU-level aggregates only |
+
+---
+
 ## Repo layout
 
 ```
@@ -253,15 +311,10 @@ hr-attrition-predictor/
 
 ## About
 
-I'm **Jeff Otterson**, a talent acquisition leader with Fortune 500 experience at Amazon and Oracle. I'm building a portfolio of people analytics projects that apply modern data science and ML to the operational problems I've seen firsthand — attrition modeling, compensation equity, hiring funnel analytics, workforce planning, and responsible AI in HR.
+Part of a People Analytics portfolio covering workforce planning, recruiting, compensation equity, and retention. Companion repositories:
 
-- **LinkedIn**: [linkedin.com/in/jeffotterson](https://www.linkedin.com/in/jeffotterson/) *(update with your actual LinkedIn)*
-- **MeritForge AI**: [meritforgeai.com](https://www.meritforgeai.com) — free AI career tools and research
-- **This repo**: MIT licensed, contributions welcome
+- [workforce-planning-demand-forecast](https://github.com/Jott2121/workforce-planning-demand-forecast) — strategic workforce planning and recruiter capacity
+- [hiring-funnel-analytics](https://github.com/Jott2121/hiring-funnel-analytics) — recruiting funnel performance and bias monitoring
+- [compensation-equity-analysis](https://github.com/Jott2121/compensation-equity-analysis) — regression-based pay equity audit
 
----
-
-## Credits
-
-- Dataset: IBM Watson Analytics (public). Used under standard fair-use for research/demonstration.
-- Libraries: `scikit-learn`, `xgboost`, `shap`, `pandas`, `streamlit`.
+Maintainer: [Jeff Otterson](https://github.com/Jott2121). Dataset: IBM Watson Analytics (public); used under standard fair-use for research and demonstration. Libraries: `scikit-learn`, `xgboost`, `shap`, `pandas`, `streamlit`. MIT licensed.
