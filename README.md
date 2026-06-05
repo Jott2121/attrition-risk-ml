@@ -1,8 +1,8 @@
-# HR Attrition Predictor
+# Explainable Attrition Risk — Logistic Regression / Random Forest / XGBoost + SHAP
 
-![CI](https://github.com/Jott2121/hr-attrition-predictor/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/Jott2121/attrition-risk-ml/actions/workflows/ci.yml/badge.svg)
 
-Responsible retention risk modeling and workforce stability decision support. Predicts voluntary attrition from standard HR data and explains each prediction with per-individual SHAP attributions, so HR business partners get conversation-ready drivers rather than opaque scores.
+Applied to the talent domain: predicts voluntary employee attrition from standard HR data and explains each prediction with per-individual SHAP attributions, so HR business partners get conversation-ready drivers rather than opaque scores.
 
 **[Live dashboard →](https://hr-attrition-predictor-jotterson.streamlit.app/)** (no install required)
 
@@ -218,7 +218,7 @@ I've sat on the hiring side of thousands of requisitions. Predictions alone don'
 | **Manager 1:1 prep** | Surface an employee's top 3 SHAP drivers to enable a specific conversation, not a generic "stay interview." |
 | **Org-level intervention** | Compare SHAP distributions across teams — flag teams where `OverTime` is the systemic driver and route to the HRBP + team lead. |
 | **Retention investment prioritization** | Rank high-value / high-risk employees and estimate dollar impact of moving them from high- to medium-risk. |
-| **Compensation equity cross-check** | Low-income × high-risk × under-promoted employees feed into the comp-equity audit (see [compensation-equity-analysis](https://github.com/Jott2121/compensation-equity-analysis) when published). |
+| **Compensation equity cross-check** | Low-income × high-risk × under-promoted employees feed into the comp-equity audit (see [pay-equity-regression](https://github.com/Jott2121/pay-equity-regression) when published). |
 
 **Explicitly not appropriate:**
 
@@ -293,7 +293,7 @@ Before a score is produced, the pipeline should enforce:
 ## Repo layout
 
 ```
-hr-attrition-predictor/
+attrition-risk-ml/
 ├── data/hr_attrition.csv        # IBM HR Analytics dataset (1,470 rows)
 ├── src/
 │   ├── data.py                  # Loading, cleaning, preprocessing pipeline
@@ -316,7 +316,7 @@ hr-attrition-predictor/
 Part of a People Analytics portfolio covering workforce planning, recruiting, compensation equity, and retention. Companion repositories:
 
 - [workforce-planning-demand-forecast](https://github.com/Jott2121/workforce-planning-demand-forecast) — strategic workforce planning and recruiter capacity
-- [hiring-funnel-analytics](https://github.com/Jott2121/hiring-funnel-analytics) — recruiting funnel performance and bias monitoring
-- [compensation-equity-analysis](https://github.com/Jott2121/compensation-equity-analysis) — regression-based pay equity audit
+- [funnel-disparity-stats](https://github.com/Jott2121/funnel-disparity-stats) — recruiting funnel performance and bias monitoring
+- [pay-equity-regression](https://github.com/Jott2121/pay-equity-regression) — regression-based pay equity audit
 
 Maintainer: [Jeff Otterson](https://github.com/Jott2121). Dataset: IBM Watson Analytics (public); used under standard fair-use for research and demonstration. Libraries: `scikit-learn`, `xgboost`, `shap`, `pandas`, `streamlit`. MIT licensed.
