@@ -1,6 +1,7 @@
 # Explainable Attrition Risk — Logistic Regression / Random Forest / XGBoost + SHAP
 
 ![CI](https://github.com/Jott2121/attrition-risk-ml/actions/workflows/ci.yml/badge.svg)
+![CodeQL](https://github.com/Jott2121/attrition-risk-ml/actions/workflows/codeql.yml/badge.svg)
 
 Applied to the talent domain: predicts voluntary employee attrition from standard HR data and explains each prediction with per-individual SHAP attributions, so HR business partners get conversation-ready drivers rather than opaque scores.
 
@@ -320,3 +321,13 @@ Part of a People Analytics portfolio covering workforce planning, recruiting, co
 - [pay-equity-regression](https://github.com/Jott2121/pay-equity-regression) — regression-based pay equity audit
 
 Maintainer: [Jeff Otterson](https://github.com/Jott2121). Dataset: IBM Watson Analytics (public); used under standard fair-use for research and demonstration. Libraries: `scikit-learn`, `xgboost`, `shap`, `pandas`, `streamlit`. MIT licensed.
+
+## Reliability & security
+
+This repo is gated like production:
+
+- **CI on every push** — the test suite runs on Python 3.12.
+- **CodeQL** — `security-extended` static analysis on every push, PR, and weekly; findings surface in the Security tab.
+- **Pinned supply chain** — GitHub Actions pinned to commit SHAs, kept current by Dependabot.
+- **Protected `main`** — required checks must pass before a merge; private vulnerability reporting is enabled.
+- **Disclosure policy** — see [SECURITY.md](SECURITY.md).
